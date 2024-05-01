@@ -1,6 +1,6 @@
 # Multipart File Uploading with Python & JavaScript
 
-This repository is a resource for my video tutorial "Beyond 5GB: How to Tackle Large File Uploads with AWS S3." The tutorial can be found [here](https://www.youtube.com/watch?v=HkF3_GLVKEg).
+This repository is a resource for my video tutorial [Beyond 5GB: How to Tackle Large File Uploads with AWS S3(https://www.youtube.com/watch?v=HkF3_GLVKEg)].
 
 Welcome to this comprehensive tutorial where we delve into the world of large file uploads using AWS S3! If you're interested in the challenge of handling files large file uploads, this video is tailor-made for you.
 
