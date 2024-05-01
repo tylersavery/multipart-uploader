@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Uploader</title>
+</head>
+
+<body>
+    <input type="file" id="upload-input" multiple="false">
+    <hr />
+
+    <script>
+        const uploadInput = document.getElementById("upload-input");
+
+        uploadInput.onchange = async (event) => {
+            const file = event.target.files[0];
+
+            if (file) {
+                const details = await initializeUpload(file.name, file.size, file.type);
+
+                const etags = await uploadToS3(file, details.key, details.chunk_size, details.urls, details.fields);
+
+                const url = await completeUpload(details.key, details.upload_id, etags)
+                if (url) {
+                    handleSuccess(url, file.type.includes('image'))
+                }
+            }
+        };
+
+
+        const initializeUpload = async (fileName, fileSize, contentType) => {
+
+            try {
+                const response = await fetch('/start-upload', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        'file_name': fileName,
+                        'file_size': fileSize,
+                        'content_type': contentType,
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok.');
+                }
+
+                const result = await response.json();
+
+                return result;
+
+                console.log('Success:', result);
+            } catch (error) {
+                console.error('Error:', error);
+            }
+
+        }
+
+        const uploadToS3 = async (file, key, chunkSize, urls, fields) => {
+
+            const etags = [];
+
+            const chunks = splitFileIntoChunks(file, chunkSize);
+            for (let i = 0; i < chunks.length; i++) {
+                try {
+                    const etag = await uploadChunk(urls[i], chunks[i], file.type, fields);
+                    etags.push(etag)
+                    console.log(`Chunk ${i + 1} of ${chunks.length} uploaded successfully`);
+                } catch (error) {
+                    console.error(`Error uploading chunk ${i + 1}:`, error);
+                    break;
+                }
+            }
+
+            return etags;
+
+        }
+
+        const splitFileIntoChunks = (file, chunkSize) => {
+            const chunks = [];
+            let start = 0;
+
+            while (start < file.size) {
+                const end = Math.min(start + chunkSize, file.size);
+                chunks.push(file.slice(start, end));
+                start = end;
+            }
+
+            return chunks;
+        }
+
+        const uploadChunk = async (url, chunk, contentType, fields) => {
+
+            try {
+                const response = await fetch(url, {
+                    method: "PUT",
+                    body: chunk,
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok.');
+                }
+
+                return response.headers.get('Etag');
+
+            } catch (error) {
+                console.log("Error", error)
+            }
+
+        }
+
+        const completeUpload = async (key, uploadId, etags) => {
+            try {
+                const response = await fetch('/complete-upload', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        'key': key,
+                        'upload_id': uploadId,
+                        'etags': etags.join(','),
+                    })
+                });
+
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok.');
+                }
+
+                const result = await response.json();
+
+                return result['url'];
+
+                console.log('Success:', result);
+            } catch (error) {
+                console.error('Error:', error);
+                return null;
+            }
+        }
+
+        const handleSuccess = (url, isImage) => {
+            console.log("Success", url);
+
+            const section = document.createElement("section");
+
+
+            if (isImage) {
+                const img = document.createElement("img")
+                img.src = url
+                img.width = 300
+                section.appendChild(img);
+            }
+
+            const link = document.createElement("a");
+            link.href = url;
+            link.target = "_blank"
+            const linkText = document.createTextNode(url)
+            link.appendChild(linkText)
+            section.appendChild(document.createElement("div"))
+            section.appendChild(link)
+
+
+            document.body.appendChild(section)
+            document.body.appendChild(document.createElement("hr"))
+
+
+        }
+
+    </script>
+</body>
+
+</html>
